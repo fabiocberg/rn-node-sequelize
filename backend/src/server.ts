@@ -2,6 +2,7 @@ import express, {Request, Response} from 'express'
 import { Sequelize } from 'sequelize'
 
 const Produto = require('../models').Produto
+const Loja = require('../models').Loja
 
 const sequelize = new Sequelize('postgres://postgres:abcd1234@localhost:5432/mydb')
 
@@ -14,30 +15,36 @@ sequelize.authenticate().then(() => {
 const app = express()
 app.use(express.json())
 
-app.get('/produtos', async (req: Request, res: Response) => {
-    console.log('GET')
-    const produtos = await Produto.findAll({
+app.get('/lojas', async (req: Request, res: Response) => {
+    const lojas = await Loja.findAll({
         order: [['nome', 'ASC']]
+    })
+    res.json({lojas})
+})
+
+app.get('/produtos', async (req: Request, res: Response) => {
+    const produtos = await Produto.findAll({
+        order: [['nome', 'ASC']],
+        include: [{
+            model: Loja,
+            attributes: ['nome']
+        }]
     })
     res.json({produtos})
 })
 
 app.post('/produtos', async (req: Request, res: Response) => {
-    console.log('POST')
     const produto = req.body
-    console.log(produto)
     if (produto && produto.nome) {
         console.log('CREATE')
-        const p = await Produto.create({nome: produto.nome, quantidade: produto.quantidade ?? 0})
+        const p = await Produto.create({nome: produto.nome, quantidade: produto.quantidade ?? 0, lojaId: produto.lojaId})
         res.json({id: p.id})
     } else {
-        console.log('CREATE ERROR')
         res.status(400).json({mensagem: 'Produto inválido'})
     }
 })
 
 app.put('/produtos', async (req: Request, res: Response) => {
-    console.log('PUT')
     const produto = req.body
     try {
         await Produto.update({quantidade: produto.quantidade}, {
@@ -51,13 +58,14 @@ app.put('/produtos', async (req: Request, res: Response) => {
     }
 })
 
-app.delete('/produtos', async (req: Request, res: Response) => {
-    const produto = req.body
+app.delete('/produtos/:id', async (req: Request, res: Response) => {
+    const produtoId = req.params.id
     await Produto.destroy({
         where: {
-            id: produto.id
+            id: produtoId
         }
     })
+    res.json({mensagem: 'Produto removido com sucesso.', id: produtoId})
 })
 
 app.listen(3333, () => {
